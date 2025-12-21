@@ -1,47 +1,132 @@
 #!/bin/bash
 # 阿里云函数计算启动脚本（自定义运行时）
 
-set -e
+# 不立即退出，以便查看错误信息
+set +e
 
+# 进入代码目录
 cd /code
 
-# 检测 Python 解释器
+# 检测 Python 解释器路径
 if [ -f "/var/fc/lang/python3.10/bin/python3" ]; then
     PYTHON="/var/fc/lang/python3.10/bin/python3"
     PIP="/var/fc/lang/python3.10/bin/pip3"
+elif [ -f "/usr/bin/python3" ]; then
+    PYTHON="/usr/bin/python3"
+    PIP="/usr/bin/pip3"
 else
     PYTHON="python3"
     PIP="pip3"
 fi
 
-echo "=== 检查依赖 ==="
-if $PYTHON -c "import uvicorn, fastapi" 2>/dev/null; then
-    echo "✓ 依赖已安装"
-    export PYTHONPATH=/code:$PYTHONPATH
-    mkdir -p /tmp/uploads 2>/dev/null || true
-    exec $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port 9000
-fi
+# 显示环境信息
+echo "=== 环境信息 ==="
+echo "使用 Python: $PYTHON"
+echo "Python 版本: $($PYTHON --version 2>&1)"
+echo "使用 Pip: $PIP"
+echo "Pip 版本: $($PIP --version 2>&1)"
+echo "当前目录: $(pwd)"
+echo "Python 路径: $PYTHONPATH"
 
-echo "依赖未安装，开始安装..."
-echo "注意：首次启动需要安装依赖，可能需要 3-5 分钟"
-echo "请在函数计算控制台将超时时间设置为 300 秒（5分钟）"
+# 显示 Python 可执行文件位置
+echo "Python 路径: $(which python3 2>/dev/null || echo '未找到')"
+echo "Pip 路径: $(which pip3 2>/dev/null || echo '未找到')"
 
-# 安装依赖
-if [ -f "/var/fc/lang/python3.10/bin/pip3" ]; then
-    /var/fc/lang/python3.10/bin/pip3 install --no-cache-dir -r requirements.txt \
-        -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
-else
-    $PIP install --no-cache-dir -r requirements.txt \
-        -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
-fi
-
-# 验证
-if ! $PYTHON -c "import uvicorn, fastapi" 2>/dev/null; then
-    echo "错误: 依赖安装失败"
+# 检查 requirements.txt 是否存在
+if [ ! -f "requirements.txt" ]; then
+    echo "错误: requirements.txt 文件不存在！"
     exit 1
 fi
 
-echo "✓ 依赖安装完成，启动应用"
+echo "=== 检查 requirements.txt ==="
+cat requirements.txt
+
+# 快速检查关键依赖是否已安装
+echo "=== 快速检查依赖 ==="
+DEPENDENCIES_INSTALLED=true
+if ! $PYTHON -c "import uvicorn" 2>/dev/null; then
+    echo "uvicorn 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import fastapi" 2>/dev/null; then
+    echo "fastapi 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import sqlalchemy" 2>/dev/null; then
+    echo "sqlalchemy 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import aiofiles" 2>/dev/null; then
+    echo "aiofiles 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import httpx" 2>/dev/null; then
+    echo "httpx 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import dotenv" 2>/dev/null; then
+    echo "python-dotenv 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import pillow" 2>/dev/null; then
+    echo "pillow 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+if ! $PYTHON -c "import mangum" 2>/dev/null; then
+    echo "mangum 未安装"
+    DEPENDENCIES_INSTALLED=false
+fi
+
+# 只有在依赖未安装时才安装（避免每次启动都安装）
+if [ "$DEPENDENCIES_INSTALLED" = false ]; then
+    echo "=== 安装 Python 依赖（首次启动）==="
+    echo "注意：此步骤可能需要较长时间，请确保函数计算的超时时间足够。"
+    
+    # 使用最快的镜像源和并行安装
+    # 尝试使用函数计算的 pip（如果存在）
+    if [ -f "/var/fc/lang/python3.10/bin/pip3" ]; then
+        echo "尝试使用函数计算的 pip 安装..."
+        /var/fc/lang/python3.10/bin/pip3 install --no-cache-dir -r requirements.txt \
+            -i https://pypi.tuna.tsinghua.edu.cn/simple \
+            --default-timeout=300 2>&1
+        INSTALL_EXIT_CODE=$?
+    else
+        echo "尝试使用系统 pip 安装..."
+        $PIP install --no-cache-dir -r requirements.txt \
+            -i https://pypi.tuna.tsinghua.edu.cn/simple \
+            --default-timeout=300 2>&1
+        INSTALL_EXIT_CODE=$?
+    fi
+    
+    if [ $INSTALL_EXIT_CODE -ne 0 ]; then
+        echo "错误: pip 安装失败，退出码: $INSTALL_EXIT_CODE"
+        echo "请检查 requirements.txt 和网络连接"
+        exit 1
+    fi
+    
+    # 再次快速验证
+    echo "=== 验证安装 ==="
+    if ! $PYTHON -c "import uvicorn" 2>/dev/null; then
+        echo "错误: uvicorn 安装失败，请检查日志"
+        $PYTHON -c "import sys; print('Python 路径:', sys.path)" 2>&1
+        exit 1
+    fi
+    if ! $PYTHON -c "import fastapi" 2>/dev/null; then
+        echo "错误: fastapi 安装失败，请检查日志"
+        exit 1
+    fi
+    echo "✓ 依赖安装完成"
+else
+    echo "✓ 依赖已安装，跳过安装步骤"
+fi
+
+# 设置 Python 路径
 export PYTHONPATH=/code:$PYTHONPATH
+
+# 创建必要的目录
 mkdir -p /tmp/uploads 2>/dev/null || true
+
+# 启动应用（立即启动，不等待）
+echo "=== 启动 FastAPI 应用 ==="
+echo "监听地址: 0.0.0.0:9000"
 exec $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port 9000
