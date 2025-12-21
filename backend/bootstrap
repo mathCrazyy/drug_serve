@@ -1,16 +1,4 @@
 #!/bin/bash
-<<<<<<< HEAD
-cd /code
-
-# 设置 Python 路径
-export PYTHONPATH=/code:$PYTHONPATH
-
-# 安装依赖到系统（FC 自定义运行时环境）
-pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --user || pip3 install -r requirements.txt --user
-
-# 启动应用
-exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9000
-=======
 # 阿里云函数计算启动脚本（自定义运行时）
 
 # 不立即退出，以便查看错误信息
@@ -84,10 +72,6 @@ if ! $PYTHON -c "import pillow" 2>/dev/null; then
     echo "pillow 未安装"
     DEPENDENCIES_INSTALLED=false
 fi
-if ! $PYTHON -c "import mangum" 2>/dev/null; then
-    echo "mangum 未安装"
-    DEPENDENCIES_INSTALLED=false
-fi
 
 # 只有在依赖未安装时才安装（避免每次启动都安装）
 if [ "$DEPENDENCIES_INSTALLED" = false ]; then
@@ -142,4 +126,3 @@ mkdir -p /tmp/uploads 2>/dev/null || true
 echo "=== 启动 FastAPI 应用 ==="
 echo "监听地址: 0.0.0.0:9000"
 exec $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port 9000
->>>>>>> fc48b286afe2030563dd640ac067f01c3c16aa53
