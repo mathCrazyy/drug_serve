@@ -13,6 +13,7 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -27,6 +28,8 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
         reader.readAsDataURL(file);
       });
     }
+    // 重置 input，允许重复选择同一文件
+    e.target.value = '';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -104,10 +107,9 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
       <div
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
+        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        onClick={() => fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
@@ -117,8 +119,31 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
           onChange={handleFileChange}
           className="hidden"
         />
-        <p className="text-gray-600 mb-2">点击或拖拽图片到此处上传</p>
-        <p className="text-sm text-gray-400">支持手机拍照、相册选择或本地上传多张图片</p>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <button
+            onClick={() => cameraInputRef.current?.click()}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            📷 拍照上传
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          >
+            🖼️ 从相册选择
+          </button>
+        </div>
+        <p className="text-sm text-gray-400 mt-4">支持手机拍照、相册选择或本地上传多张图片</p>
       </div>
 
       {previews.length > 0 && (
