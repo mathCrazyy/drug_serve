@@ -61,7 +61,21 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
-      onError(error.response?.data?.message || '上传失败，请重试');
+      console.error('上传错误详情:', error);
+      let errorMessage = '上传失败，请重试';
+      
+      if (error.response) {
+        // 服务器返回了错误响应
+        errorMessage = error.response.data?.detail || error.response.data?.message || `服务器错误: ${error.response.status}`;
+      } else if (error.request) {
+        // 请求已发出但没有收到响应
+        errorMessage = '无法连接到服务器，请检查网络连接或确认后端服务是否运行';
+      } else {
+        // 其他错误
+        errorMessage = error.message || '上传失败，请重试';
+      }
+      
+      onError(errorMessage);
     } finally {
       setUploading(false);
     }
