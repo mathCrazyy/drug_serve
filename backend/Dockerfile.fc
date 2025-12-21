@@ -1,0 +1,23 @@
+FROM aliyunfc/runtime-python3.10:build-latest
+
+# 设置工作目录
+WORKDIR /code
+
+# 复制依赖文件
+COPY requirements.txt .
+
+# 安装依赖
+RUN pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 复制应用代码
+COPY . .
+
+# 创建上传目录
+RUN mkdir -p uploads /tmp/uploads
+
+# 设置 bootstrap 执行权限
+RUN chmod +x bootstrap
+
+# 暴露端口
+EXPOSE 9000
+

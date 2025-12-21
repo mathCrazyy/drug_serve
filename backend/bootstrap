@@ -1,38 +1,21 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-阿里云函数计算启动脚本
-"""
+#!/bin/bash
+# 阿里云函数计算启动脚本（自定义运行时）
 
-import sys
-import os
+set -e
 
-# 添加当前目录到 Python 路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+# 进入代码目录
+cd /code
 
-# 确保依赖已安装（函数计算会自动安装 requirements.txt 中的依赖）
-# 这里直接导入应用
-from app.main import app
+# 检查并安装依赖
+echo "检查 Python 依赖..."
+if ! python3 -c "import uvicorn" 2>/dev/null; then
+    echo "安装依赖包..."
+    pip3 install --user -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+fi
 
-# 对于函数计算，需要使用 ASGI 适配器
-try:
-    from mangum import Mangum
-    handler = Mangum(app, lifespan="off")
-    
-    # 函数计算的入口函数
-    def handler_wrapper(environ, start_response):
-        """WSGI 兼容的入口函数"""
-        return handler(environ, start_response)
-    
-    # 如果直接运行，使用 uvicorn
-    if __name__ == "__main__":
-        import uvicorn
-        port = int(os.environ.get("PORT", 9000))
-        uvicorn.run(app, host="0.0.0.0", port=port)
-        
-except ImportError:
-    # 如果没有 mangum，直接使用 uvicorn
-    import uvicorn
-    port = int(os.environ.get("PORT", 9000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+# 设置 Python 路径
+export PYTHONPATH=/code:$PYTHONPATH
+
+# 启动应用
+echo "启动 FastAPI 应用..."
+exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9000
