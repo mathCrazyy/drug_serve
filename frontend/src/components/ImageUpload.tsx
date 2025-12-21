@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { uploadImages } from '../services/drugService';
+import { compressImages, formatFileSize } from '../utils/imageCompress';
 
 interface ImageUploadProps {
   onUploadSuccess: (imageIds: string[]) => void;
@@ -10,6 +11,7 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,9 +52,21 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
   const handleUpload = async () => {
     if (files.length === 0) return;
 
+    setCompressing(true);
     setUploading(true);
+    
     try {
-      const responses = await uploadImages(files);
+      // 压缩图片，确保总大小小于 6MB
+      const compressedFiles = await compressImages(files, 6 * 1024 * 1024);
+      
+      // 计算压缩后的总大小
+      const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
+      console.log(`压缩完成，总大小: ${formatFileSize(totalSize)}`);
+      
+      setCompressing(false);
+      
+      // 上传压缩后的图片
+      const responses = await uploadImages(compressedFiles);
       const imageIds = responses.map((r) => r.image_id);
       onUploadSuccess(imageIds);
       setFiles([]);
@@ -62,6 +76,7 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
       }
     } catch (error: any) {
       console.error('上传错误详情:', error);
+      setCompressing(false);
       let errorMessage = '上传失败，请重试';
       
       if (error.response) {
@@ -71,7 +86,7 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
         // 请求已发出但没有收到响应
         errorMessage = '无法连接到服务器，请检查网络连接或确认后端服务是否运行';
       } else {
-        // 其他错误
+        // 其他错误（包括压缩错误）
         errorMessage = error.message || '上传失败，请重试';
       }
       
@@ -131,11 +146,23 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
           </div>
           <button
             onClick={handleUpload}
-            disabled={uploading}
+            disabled={uploading || compressing}
             className="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {uploading ? '上传中...' : `上传 ${files.length} 张图片`}
+            {compressing 
+              ? '压缩中...' 
+              : uploading 
+                ? '上传中...' 
+                : `上传 ${files.length} 张图片`}
           </button>
+          {files.length > 0 && (
+            <div className="mt-2 text-sm text-gray-500 text-center">
+              总大小: {formatFileSize(files.reduce((sum, file) => sum + file.size, 0))} 
+              {files.reduce((sum, file) => sum + file.size, 0) > 6 * 1024 * 1024 && (
+                <span className="text-orange-600 ml-2">(将自动压缩至 6MB 以内)</span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
