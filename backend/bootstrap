@@ -1,8 +1,7 @@
 #!/bin/bash
 # 阿里云函数计算启动脚本（自定义运行时）
 
-# 不立即退出，以便查看错误信息
-set +e
+set -e  # 遇到错误立即退出
 
 # 进入代码目录
 cd /code
@@ -26,40 +25,71 @@ echo "Python 版本: $($PYTHON --version 2>&1)"
 echo "使用 Pip: $PIP"
 echo "Pip 版本: $($PIP --version 2>&1)"
 echo "当前目录: $(pwd)"
-echo "Python 路径: $PYTHONPATH"
+echo "工作目录内容:"
+ls -la /code | head -10
 
-# 显示 Python 可执行文件位置
-echo "Python 路径: $(which python3 2>/dev/null || echo '未找到')"
-echo "Pip 路径: $(which pip3 2>/dev/null || echo '未找到')"
-
-# 强制安装依赖到函数计算的 Python 环境
-echo "=== 安装 Python 依赖 ==="
-$PIP install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
-
-# 检查安装结果
-INSTALL_RESULT=$?
-if [ $INSTALL_RESULT -ne 0 ]; then
-    echo "警告: 依赖安装可能有问题，退出码: $INSTALL_RESULT"
-    echo "尝试使用系统 pip..."
-    pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
-fi
-
-# 验证关键依赖
-echo "=== 验证依赖安装 ==="
-$PYTHON -c "import uvicorn; print('✓ uvicorn:', uvicorn.__version__)" 2>&1
-if [ $? -ne 0 ]; then
-    echo "✗ 错误: uvicorn 未找到"
-    echo "尝试查找 uvicorn..."
-    $PIP list 2>&1 | grep uvicorn || echo "uvicorn 未在已安装包列表中"
-    $PYTHON -c "import sys; print('Python 路径:', sys.path)" 2>&1
-    echo "尝试直接导入..."
-    $PYTHON -c "import sys; sys.path.insert(0, '/code'); import uvicorn" 2>&1
+# 检查 requirements.txt 是否存在
+if [ ! -f "requirements.txt" ]; then
+    echo "错误: requirements.txt 文件不存在！"
     exit 1
 fi
 
+echo "=== 检查 requirements.txt ==="
+cat requirements.txt
+
+# 安装依赖（尝试多种方式）
+echo "=== 安装 Python 依赖 ==="
+
+# 方法1: 使用函数计算的 pip（如果存在）
+if [ -f "/var/fc/lang/python3.10/bin/pip3" ]; then
+    echo "方法1: 使用函数计算的 pip 安装..."
+    /var/fc/lang/python3.10/bin/pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1 || {
+        echo "方法1 失败，尝试方法2..."
+        # 方法2: 使用 --user 安装到用户目录
+        /var/fc/lang/python3.10/bin/pip3 install --user --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1 || {
+            echo "方法2 失败，尝试方法3..."
+            # 方法3: 使用系统 pip
+            pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
+        }
+    }
+else
+    # 如果没有函数计算的 pip，使用系统 pip
+    echo "使用系统 pip 安装..."
+    $PIP install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1 || {
+        echo "尝试使用 --user 安装..."
+        $PIP install --user --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1
+    }
+fi
+
+# 显示安装的包
+echo "=== 已安装的包 ==="
+$PIP list 2>&1 | grep -E "(uvicorn|fastapi|sqlalchemy)" || echo "未找到关键包"
+
+# 验证关键依赖
+echo "=== 验证依赖安装 ==="
+
+# 验证 uvicorn
+$PYTHON -c "import uvicorn; print('✓ uvicorn:', uvicorn.__version__)" 2>&1
+if [ $? -ne 0 ]; then
+    echo "✗ 错误: uvicorn 未找到"
+    echo "Python 搜索路径:"
+    $PYTHON -c "import sys; print('\n'.join(sys.path))" 2>&1
+    echo "尝试查找 uvicorn 安装位置:"
+    $PIP show uvicorn 2>&1 || echo "pip show 失败"
+    find /var/fc -name "uvicorn" -type f 2>/dev/null | head -5 || echo "未找到 uvicorn"
+    exit 1
+fi
+
+# 验证 fastapi
 $PYTHON -c "import fastapi; print('✓ fastapi:', fastapi.__version__)" 2>&1 || {
-    echo "警告: fastapi 可能未正确安装"
+    echo "✗ 错误: fastapi 未找到"
+    exit 1
 }
+
+# 验证其他关键依赖
+echo "验证其他依赖..."
+$PYTHON -c "import sqlalchemy; print('✓ sqlalchemy:', sqlalchemy.__version__)" 2>&1 || echo "警告: sqlalchemy 未找到"
+$PYTHON -c "import aiofiles; print('✓ aiofiles 已安装')" 2>&1 || echo "警告: aiofiles 未找到"
 
 # 设置 Python 路径
 export PYTHONPATH=/code:$PYTHONPATH
@@ -69,8 +99,12 @@ echo "=== 最终配置 ==="
 echo "PYTHONPATH: $PYTHONPATH"
 echo "工作目录: $(pwd)"
 echo "使用 Python: $PYTHON"
+echo "Python 可执行文件: $(which python3 2>/dev/null || echo '未找到')"
 
-# 启动应用（使用检测到的 Python 解释器）
+# 创建必要的目录
+mkdir -p /tmp/uploads 2>/dev/null || true
+
+# 启动应用
 echo "=== 启动 FastAPI 应用 ==="
 echo "监听地址: 0.0.0.0:9000"
 exec $PYTHON -m uvicorn app.main:app --host 0.0.0.0 --port 9000
