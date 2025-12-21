@@ -6,16 +6,37 @@ set -e
 # 进入代码目录
 cd /code
 
-# 检查并安装依赖
-echo "检查 Python 依赖..."
-if ! python3 -c "import uvicorn" 2>/dev/null; then
-    echo "安装依赖包..."
-    pip3 install --user -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-fi
+# 显示环境信息
+echo "=== 环境信息 ==="
+echo "Python 版本: $(python3 --version)"
+echo "Pip 版本: $(pip3 --version)"
+echo "当前目录: $(pwd)"
+echo "Python 路径: $PYTHONPATH"
+
+# 强制安装依赖（每次启动都安装，确保依赖存在）
+echo "=== 安装 Python 依赖 ==="
+pip3 install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple 2>&1 | head -20
+
+# 验证关键依赖
+echo "=== 验证依赖安装 ==="
+python3 -c "import uvicorn; print('uvicorn:', uvicorn.__version__)" || {
+    echo "错误: uvicorn 安装失败"
+    pip3 list | grep uvicorn || echo "uvicorn 未找到"
+    exit 1
+}
+
+python3 -c "import fastapi; print('fastapi:', fastapi.__version__)" || {
+    echo "警告: fastapi 可能未正确安装"
+}
 
 # 设置 Python 路径
 export PYTHONPATH=/code:$PYTHONPATH
 
+# 显示最终 Python 路径
+echo "=== 最终配置 ==="
+echo "PYTHONPATH: $PYTHONPATH"
+echo "工作目录: $(pwd)"
+
 # 启动应用
-echo "启动 FastAPI 应用..."
+echo "=== 启动 FastAPI 应用 ==="
 exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9000

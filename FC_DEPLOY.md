@@ -57,15 +57,37 @@ PORT=9000
 
 ### 4. 打包部署
 
-#### 方法一：使用函数计算控制台上传
+#### 方法一：使用 Dockerfile 构建自定义运行时（推荐）
+
+对于自定义运行时，**必须使用 Dockerfile 构建镜像**，在构建时安装依赖：
+
+1. **构建 Docker 镜像**：
+```bash
+cd backend
+docker build -t drug-serve-fc:latest -f Dockerfile .
+```
+
+2. **导出镜像为 tar 文件**：
+```bash
+docker save drug-serve-fc:latest -o drug-serve-fc.tar
+```
+
+3. **在函数计算控制台**：
+   - 选择"自定义运行时"
+   - 上传 `drug-serve-fc.tar` 镜像文件
+   - 启动命令：`./bootstrap`
+
+#### 方法二：直接上传代码包（不推荐，依赖可能无法安装）
 
 1. 打包 backend 目录：
 ```bash
 cd backend
-zip -r function.zip . -x "venv/*" -x "__pycache__/*" -x "*.pyc" -x ".git/*"
+zip -r function.zip . -x "venv/*" -x "__pycache__/*" -x "*.pyc" -x ".git/*" -x "*.db"
 ```
 
 2. 在函数计算控制台上传 `function.zip`
+
+**注意**：此方法可能无法正确安装依赖，建议使用方法一。
 
 #### 方法二：使用命令行工具
 
@@ -128,11 +150,31 @@ Resources:
 ### 1. 仍然提示 "No module named uvicorn"
 
 **解决方案**：
-- ✅ **已修复**：`bootstrap` 文件已改为 bash 脚本，会在启动前自动检查并安装依赖
-- 确保 `requirements.txt` 在代码包根目录（与 `bootstrap` 同级）
-- 检查函数计算的 Python 版本（建议 3.10）
-- 对于自定义运行时，`bootstrap` 脚本会自动使用 `pip3 install --user` 安装依赖
-- 如果仍有问题，检查函数计算的日志，查看依赖安装过程
+
+**重要**：对于自定义运行时，必须使用 Dockerfile 构建镜像！
+
+1. **使用 Dockerfile 构建**（推荐）：
+   ```bash
+   cd backend
+   docker build -t drug-serve-fc:latest -f Dockerfile .
+   docker save drug-serve-fc:latest -o drug-serve-fc.tar
+   ```
+   然后在函数计算控制台上传 `drug-serve-fc.tar`
+
+2. **检查 bootstrap 脚本**：
+   - ✅ 已改进：添加了详细的日志输出和错误检查
+   - 脚本会在启动前强制安装依赖
+   - 会验证关键依赖是否安装成功
+
+3. **查看日志**：
+   - 在函数计算控制台查看"日志输出"
+   - 检查是否有依赖安装的错误信息
+   - 确认 Python 路径是否正确
+
+4. **确保文件结构**：
+   - `bootstrap` 文件在代码包根目录
+   - `requirements.txt` 在代码包根目录
+   - `app/` 目录包含所有应用代码
 
 ### 2. Bootstrap 权限错误
 
