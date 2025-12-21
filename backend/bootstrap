@@ -1,17 +1,11 @@
 #!/bin/bash
 cd /code
 
-# 安装依赖（如果还没有安装）
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-else
-    source venv/bin/activate
-fi
-
 # 设置 Python 路径
 export PYTHONPATH=/code:$PYTHONPATH
+
+# 安装依赖到系统（FC 自定义运行时环境）
+pip3 install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --user || pip3 install -r requirements.txt --user
 
 # 启动应用
 exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9000
