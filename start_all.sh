@@ -25,7 +25,7 @@ fi
 if lsof -ti:8000 > /dev/null 2>&1; then
     echo "   后端服务已在运行 (端口 8000)"
 else
-    nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+    nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
     echo "   后端服务已启动 (PID: $!)"
     echo "   日志: tail -f /tmp/backend.log"
 fi
