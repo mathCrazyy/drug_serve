@@ -128,9 +128,11 @@ Resources:
 ### 1. 仍然提示 "No module named uvicorn"
 
 **解决方案**：
-- 确保 `requirements.txt` 在代码包根目录
+- ✅ **已修复**：`bootstrap` 文件已改为 bash 脚本，会在启动前自动检查并安装依赖
+- 确保 `requirements.txt` 在代码包根目录（与 `bootstrap` 同级）
 - 检查函数计算的 Python 版本（建议 3.10）
-- 在函数配置中设置"安装依赖"选项
+- 对于自定义运行时，`bootstrap` 脚本会自动使用 `pip3 install --user` 安装依赖
+- 如果仍有问题，检查函数计算的日志，查看依赖安装过程
 
 ### 2. Bootstrap 权限错误
 
