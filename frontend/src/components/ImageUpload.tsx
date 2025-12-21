@@ -118,7 +118,7 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
           className="hidden"
         />
         <p className="text-gray-600 mb-2">点击或拖拽图片到此处上传</p>
-        <p className="text-sm text-gray-400">支持手机拍照或本地上传多张图片</p>
+        <p className="text-sm text-gray-400">支持手机拍照、相册选择或本地上传多张图片</p>
       </div>
 
       {previews.length > 0 && (
