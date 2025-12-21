@@ -104,10 +104,9 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
       <div
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
+        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        onClick={() => fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
@@ -117,8 +116,14 @@ export const ImageUpload = ({ onUploadSuccess, onError }: ImageUploadProps) => {
           onChange={handleFileChange}
           className="hidden"
         />
-        <p className="text-gray-600 mb-2">点击或拖拽图片到此处上传</p>
-        <p className="text-sm text-gray-400">支持手机拍照、相册选择或本地上传多张图片</p>
+        <p className="text-gray-600 mb-4">点击或拖拽图片到此处上传</p>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          上传图片
+        </button>
+        <p className="text-sm text-gray-400 mt-4">支持手机拍照、相册选择或本地上传多张图片</p>
       </div>
 
       {previews.length > 0 && (
