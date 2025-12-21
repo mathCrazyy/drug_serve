@@ -26,13 +26,30 @@ ESA 构建系统默认在项目根目录查找 `package.json`，但本项目的�
 - **安装命令**: `npm install`（会自动执行 `cd frontend && npm install`）
 - **构建命令**: `npm run build`（会自动执行 `cd frontend && npm run build`）
 
-### 2. 环境变量配置
+### 2. 环境变量配置（重要！）
 
-如果需要配置前端环境变量，在 ESA 控制台添加：
+**必须配置** `VITE_API_BASE_URL` 环境变量，否则前端无法连接到后端 API。
 
+在 ESA 控制台添加环境变量：
+
+**变量名**：`VITE_API_BASE_URL`
+
+**变量值**：你的后端 API 地址
+
+#### 如果后端部署在函数计算：
 ```
-VITE_API_BASE_URL=https://your-api-domain.com
+VITE_API_BASE_URL=https://your-function-id.cn-hangzhou.fc.aliyuncs.com/2016-08-15/proxy/your-service/your-function
 ```
+
+#### 如果后端部署在 ECS：
+```
+VITE_API_BASE_URL=http://your-ecs-ip:8000
+```
+
+**注意**：
+- 环境变量需要在构建时配置
+- 配置后需要重新构建应用
+- 详细配置说明请参考 `ESA_API_CONFIG.md`
 
 ### 3. 输出目录配置
 
