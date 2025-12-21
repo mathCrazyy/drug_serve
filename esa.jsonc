@@ -1,0 +1,9 @@
+{
+  "assets": {
+    "directory": "frontend/dist"
+  },
+  "function": {
+    "file": "frontend/dist/index.html"
+  }
+}
+
