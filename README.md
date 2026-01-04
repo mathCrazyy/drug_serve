@@ -75,18 +75,44 @@
 - **能力**：图像理解、信息提取、结构化输出
 
 ### 部署与运维
-- **前端部署**：阿里云 ESA（弹性 Serverless 应用）
-- **容器化**：Docker + Docker Compose
+- **前端部署**：阿里云 ESA（弹性 Serverless 应用）- Pages 静态托管
+- **后端部署**：阿里云函数计算 FC（Function Compute）- Serverless 函数（自定义运行时）
+- **AI 服务**：火山引擎豆包 API（多模态视觉模型）
+- **容器化**：Docker + Docker Compose（本地开发环境）
 - **版本控制**：Git + GitHub
 
 ## 项目结构
 
 ```
 drug_serve/
-├── frontend/          # 前端项目
-├── backend/           # 后端项目
-└── README.md
+├── frontend/              # React 前端项目
+│   ├── src/
+│   │   ├── components/    # React 组件
+│   │   ├── services/      # API 服务
+│   │   ├── types/         # TypeScript 类型定义
+│   │   └── utils/         # 工具函数（图片压缩等）
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/               # FastAPI 后端项目
+│   ├── app/
+│   │   ├── main.py        # FastAPI 应用入口
+│   │   ├── database.py    # 数据库配置
+│   │   ├── models.py      # 数据模型
+│   │   ├── routers/       # API 路由
+│   │   └── services/      # 业务逻辑（豆包 API 集成）
+│   ├── bootstrap          # 函数计算启动脚本
+│   ├── requirements.txt   # Python 依赖
+│   └── Dockerfile.fc      # 函数计算 Dockerfile
+├── edge-functions/        # 边缘函数（可选）
+├── docs/                  # 文档目录
+├── docker-compose.yml     # Docker Compose 配置
+└── README.md              # 项目说明
 ```
+
+详细文档：
+- `FC_函数计算部署指南.md` - 后端函数计算部署指南
+- `ESA_完整部署流程.md` - 前端 ESA 部署指南
+- `完整环境变量配置清单.md` - 环境变量配置说明
 
 ## 安装与运行
 
@@ -99,7 +125,7 @@ cd backend
 
 2. 创建虚拟环境：
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
@@ -109,14 +135,23 @@ pip install -r requirements.txt
 ```
 
 4. 配置环境变量：
-```bash
-cp .env.example .env
-# 编辑 .env 文件，填入豆包 API 配置
+创建 `backend/.env` 文件（参考 `完整环境变量配置清单.md`）：
+```env
+API_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+API_KEY=你的豆包API密钥
+MODEL_ID=你的模型ID
+DATABASE_URL=sqlite:///./drugs.db
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=10485760
 ```
 
 5. 运行后端服务：
 ```bash
-uvicorn app.main:app --reload
+# 使用启动脚本（推荐）
+./start.sh
+
+# 或直接运行
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 前端设置
@@ -190,20 +225,70 @@ MAX_FILE_SIZE=10485760  # 10MB
 
 ## 部署
 
-详细部署指南请参考 [DEPLOY.md](./DEPLOY.md)
+### 生产环境部署架构
 
-### GitHub 部署
+```
+前端（ESA Pages） → 后端（函数计算 FC） → 豆包 API
+```
 
-前端可以部署到 GitHub Pages 或 Vercel。
+- **前端**：部署到阿里云 ESA，通过环境变量 `VITE_API_BASE_URL` 连接后端
+- **后端**：部署到阿里云函数计算 FC（自定义运行时），监听端口 9000
+- **AI 服务**：使用火山引擎豆包 API 进行图片识别
 
-### 阿里云 ECS 部署
+### 快速部署指南
 
-1. 将代码推送到 GitHub
-2. 在 ECS 上克隆仓库
-3. 配置 Nginx 反向代理
-4. 使用 systemd 或 Docker 运行后端服务
+#### 1. 后端部署（函数计算 FC）
 
-详细步骤请参考 `DEPLOY.md` 文件。
+1. **准备代码包**
+   ```bash
+   cd backend
+   ./package_fc.sh  # 或手动打包，排除 venv、uploads 等目录
+   ```
+
+2. **在函数计算控制台创建函数**
+   - 选择自定义运行时（Custom Runtime）
+   - 上传代码包或 Docker 镜像
+   - 启动命令：`./bootstrap`
+   - 监听端口：`9000`
+
+3. **配置环境变量**（在函数计算控制台）
+   ```env
+   API_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+   API_KEY=你的豆包API密钥
+   MODEL_ID=你的模型ID（如 doubao-1.5-vision-pro-250328）
+   DATABASE_URL=sqlite:///./drugs.db
+   UPLOAD_DIR=/tmp/uploads
+   MAX_FILE_SIZE=10485760
+   ```
+
+4. **创建 HTTP 触发器**
+   - 触发器类型：HTTP 触发器
+   - 认证方式：匿名访问
+   - 获取触发器访问地址（用于前端配置）
+
+#### 2. 前端部署（ESA）
+
+1. **在 ESA 控制台创建应用**
+   - 代码源：GitHub 仓库
+   - 构建目录：留空（使用根目录）
+   - 安装命令：`npm install`
+   - 构建命令：`npm run build`
+   - 输出目录：`frontend/dist`
+
+2. **配置环境变量**（在 ESA 控制台）
+   ```env
+   VITE_API_BASE_URL=https://your-function-url.cn-hangzhou.fcapp.run
+   ```
+   **注意**：使用 `https://` 协议，不要加末尾斜杠
+
+3. **构建和部署**
+   - 保存环境变量后触发构建
+   - 等待构建完成并部署
+
+详细部署步骤请参考：
+- `FC_函数计算部署指南.md` - 后端部署详细指南
+- `ESA_完整部署流程.md` - 前端部署详细指南
+- `完整环境变量配置清单.md` - 环境变量配置说明
 
 ## API 文档
 
